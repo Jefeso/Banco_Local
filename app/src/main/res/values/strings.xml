@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Banco Local</string>
+    <string-array name="categorias_array">
+        <item>Alimentação</item>
+        <item>Transporte</item>
+        <item>Lazer</item>
+        <item>Contas</item>
+        <item>Outros</item>
+    </string-array>
+</resources>
