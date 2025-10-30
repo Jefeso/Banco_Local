@@ -1,3 +1,5 @@
+package br.edu.fatecpg.bancolocal
+
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert

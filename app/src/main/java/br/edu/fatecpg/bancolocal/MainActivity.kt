@@ -1,4 +1,4 @@
-package br.edu.fatecpg.bancolocal // Certifique-se que este 'package' é o mesmo do seu projeto
+package br.edu.fatecpg.bancolocal
 
 import android.content.Intent
 import android.os.Bundle
@@ -32,16 +32,19 @@ class MainActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.recyclerViewDespesas)
         fab = findViewById(R.id.fabAdicionar)
 
-        // 3. Configura o Adapter e o RecyclerView
-        adapter = DespesaAdapter(emptyList()) // Começa com uma lista vazia
+// 3. Configura o Adapter e o RecyclerView
+        adapter = DespesaAdapter(emptyList()) { despesaClicada ->
+            // Ação de clique para cada item da lista
+            val intent = Intent(this, AdicionarDespesaActivity::class.java)
+            intent.putExtra("DESPESA_ID", despesaClicada.id)
+            startActivity(intent)
+        }
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        // 4. Carrega os dados do banco (será feito no onResume)
 
-        // 5. Configura o clique do botão flutuante (por enquanto, apenas um log)
         fab.setOnClickListener {
-            // Abre a tela de adicionar nova despesa
+
             val intent = Intent(this, AdicionarDespesaActivity::class.java)
             startActivity(intent)
         }

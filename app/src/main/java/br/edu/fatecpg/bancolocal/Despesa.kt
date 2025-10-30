@@ -1,3 +1,5 @@
+package br.edu.fatecpg.bancolocal
+
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 

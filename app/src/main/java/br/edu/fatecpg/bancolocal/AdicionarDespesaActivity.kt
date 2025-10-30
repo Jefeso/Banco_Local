@@ -1,8 +1,6 @@
-package br.edu.fatecpg.bancolocal // Verifique se este é o seu pacote
+package br.edu.fatecpg.bancolocal
 
-import AppDatabase
-import Despesa
-import DespesaDao
+
 import android.app.DatePickerDialog
 import android.os.Bundle
 import android.widget.ArrayAdapter
@@ -15,16 +13,21 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Calendar
+// Imports que VAMOS precisar para os próximos passos
+import android.view.View
+import androidx.appcompat.app.AlertDialog
+import kotlinx.coroutines.withContext
 
 class AdicionarDespesaActivity : AppCompatActivity() {
 
     // Declaração dos componentes da UI
+    private lateinit var btnExcluir: Button
+    private var despesaId: Int = -1
     private lateinit var etDescricao: EditText
     private lateinit var etValor: EditText
     private lateinit var spinnerCategoria: Spinner
     private lateinit var btnData: Button
     private lateinit var btnSalvar: Button
-    // private lateinit var btnExcluir: Button // Deixaremos isso para a parte de "Editar"
 
     // Declaração do banco
     private lateinit var db: AppDatabase
@@ -47,34 +50,40 @@ class AdicionarDespesaActivity : AppCompatActivity() {
         spinnerCategoria = findViewById(R.id.spinnerCategoria)
         btnData = findViewById(R.id.btnData)
         btnSalvar = findViewById(R.id.btnSalvar)
-        // btnExcluir = findViewById(R.id.btnExcluir) // Fica para depois
+        btnExcluir = findViewById(R.id.btnExcluir)
 
-        // Configura os componentes
+        // Verifica se recebemos um ID da MainActivity
+        despesaId = intent.getIntExtra("DESPESA_ID", -1)
+
+        if (despesaId != -1) {
+            setTitle("Editar Despesa")
+            carregarDadosDespesa(despesaId)
+        } else {
+            // Estamos no modo ADIÇÃO
+            setTitle("Adicionar Despesa")
+            atualizarTextoBotaoData()
+        }
+
         setupSpinner()
         setupDatePicker()
 
-        // Configura o clique do botão Salvar
         btnSalvar.setOnClickListener {
             salvarDespesa()
         }
 
-        // Atualiza o texto do botão de data com a data atual (hoje)
-        atualizarTextoBotaoData()
+        btnExcluir.setOnClickListener {
+            excluirDespesa()
+        }
     }
 
     private fun setupSpinner() {
-        // Cria um adapter usando o array de categorias que definimos no strings.xml
         ArrayAdapter.createFromResource(
-            this,
-            R.array.categorias_array, // Nosso array de strings
-            android.R.layout.simple_spinner_item // Layout padrão do spinner
+            this, R.array.categorias_array, android.R.layout.simple_spinner_item
         ).also { adapter ->
-            // Layout padrão para o dropdown
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerCategoria.adapter = adapter
         }
     }
-
     private fun setupDatePicker() {
         btnData.setOnClickListener {
             val calendario = Calendar.getInstance()
@@ -82,18 +91,12 @@ class AdicionarDespesaActivity : AppCompatActivity() {
             val mes = calendario.get(Calendar.MONTH)
             val dia = calendario.get(Calendar.DAY_OF_MONTH)
 
-            // Cria o pop-up (diálogo) do seletor de data
             val datePickerDialog = DatePickerDialog(
                 this,
                 { _, anoSelecionado, mesSelecionado, diaSelecionado ->
-                    // Quando o usuário seleciona uma data
                     val calendarioSelecionado = Calendar.getInstance()
                     calendarioSelecionado.set(anoSelecionado, mesSelecionado, diaSelecionado)
-
-                    // Salva a data como um Long (timestamp)
                     dataSelecionada = calendarioSelecionado.timeInMillis
-
-                    // Atualiza o texto do botão
                     atualizarTextoBotaoData()
                 },
                 ano, mes, dia
@@ -101,52 +104,83 @@ class AdicionarDespesaActivity : AppCompatActivity() {
             datePickerDialog.show()
         }
     }
+    private fun atualizarTextoBotaoData() {
+        val formatador = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+        btnData.text = formatador.format(dataSelecionada)
+    }
 
     private fun salvarDespesa() {
-        // Pega os valores dos campos
         val descricao = etDescricao.text.toString()
         val valorStr = etValor.text.toString()
         val categoria = spinnerCategoria.selectedItem.toString()
 
-        // Validação dos campos obrigatórios (requisito do PDF)
+        // Validações
         if (descricao.isBlank()) {
-            Toast.makeText(this, "A descrição é obrigatória", Toast.LENGTH_SHORT).show()
-            etDescricao.error = "Campo obrigatório"
-            return // Para a execução
+            etDescricao.error = "Campo obrigatório"; return
         }
         if (valorStr.isBlank()) {
-            Toast.makeText(this, "O valor é obrigatório", Toast.LENGTH_SHORT).show()
-            etValor.error = "Campo obrigatório"
-            return // Para a execução
+            etValor.error = "Campo obrigatório"; return
         }
-
         val valor = valorStr.toDoubleOrNull()
         if (valor == null || valor <= 0) {
-            Toast.makeText(this, "O valor é inválido", Toast.LENGTH_SHORT).show()
-            etValor.error = "Valor inválido"
-            return
+            etValor.error = "Valor inválido"; return
         }
 
-        // Cria o objeto Despesa
-        val novaDespesa = Despesa(
+        val despesaParaSalvar = Despesa(
+            id = if (despesaId == -1) 0 else despesaId,
             descricao = descricao,
             valor = valor,
             categoria = categoria,
             data = dataSelecionada
         )
+        // ---- FIM DA LÓGICA ----
 
-        // Salva no banco de dados usando Coroutines (fora da thread principal)
         CoroutineScope(Dispatchers.IO).launch {
-            despesaDao.salvar(novaDespesa) // O 'salvar' é 'suspend'
-
-            // Após salvar, fecha a tela e volta para a MainActivity
-            finish() // Isso deve ser chamado na thread principal, mas 'finish()' é seguro.
+            despesaDao.salvar(despesaParaSalvar)
+            finish()
         }
     }
 
-    private fun atualizarTextoBotaoData() {
-        // Formata o Long (timestamp) para uma data legível (dd/MM/yyyy)
-        val formatador = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
-        btnData.text = formatador.format(dataSelecionada)
+    private fun carregarDadosDespesa(id: Int) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val despesa = despesaDao.getDespesaPorId(id)
+
+            withContext(Dispatchers.Main) {
+                despesa?.let {
+                    etDescricao.setText(it.descricao)
+                    etValor.setText(it.valor.toString())
+                    dataSelecionada = it.data
+                    atualizarTextoBotaoData()
+
+                    val categorias = resources.getStringArray(R.array.categorias_array)
+                    val posicao = categorias.indexOf(it.categoria)
+                    if (posicao >= 0) {
+                        spinnerCategoria.setSelection(posicao)
+                    }
+
+                    btnExcluir.visibility = View.VISIBLE
+                }
+            }
+        }
     }
+
+    private fun excluirDespesa() {
+        AlertDialog.Builder(this)
+            .setTitle("Confirmar Exclusão")
+            .setMessage("Tem certeza que deseja excluir esta despesa?")
+            .setPositiveButton("Excluir") { _, _ ->
+                CoroutineScope(Dispatchers.IO).launch {
+                    val despesaParaExcluir = Despesa(id = despesaId, descricao = "", valor = 0.0, categoria = "", data = 0L)
+                    despesaDao.excluir(despesaParaExcluir)
+                    finish()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+}
+
+private fun AppDatabase.despesaDao() {
+    TODO("Not yet implemented")
 }
